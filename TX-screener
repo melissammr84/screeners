@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Texas Program Eligibility Screener</title>
+<style>
+  body {
+    font-family: 'Arial', sans-serif;
+    background-color: #f4f4f9;
+    padding: 20px;
+  }
+  .container {
+    background-color: #ffffff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    margin: auto;
+    margin-bottom: 20px;
+    max-width: 500px;
+  }
+  h2 {
+    color: #0056b3;
+    font-size: 24px;
+  }
+  label {
+    display: block;
+    margin: 15px 0;
+    font-size: 20px;
+  }
+  input[type="number"], input[type="checkbox"] {
+    width: 100%;
+    padding: 10px;
+    margin-top: 5px;
+    font-size: 18px;
+    box-sizing: border-box;
+  }
+  button {
+    background-color: #4CAF50;
+    color: white;
+    padding: 15px 30px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 20px;
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+  }
+  button:hover {
+    background-color: #45a049;
+  }
+  #result {
+    font-size: 20px;
+  }
+</style>
+</head>
+<body>
+<div class="container" id="additional-questions">
+  <h2>Preliminary Eligibility Questions</h2>
+  <label><input type="checkbox" id="ssn"> Do you have a SSN?</label>
+  <label><input type="checkbox" id="medicaid"> Do you have Medicaid?</label>
+  <label><input type="checkbox" id="childrenUnder5"> Do you have children under 5 years old?</label>
+  <label><input type="checkbox" id="childrenUnder18"> Do you have children under 18 years old?</label>
+  <label><input type="checkbox" id="over65"> Are you over 65 years old?</label>
+  <button type="button" onclick="checkPreliminaryEligibility()">Continue to Income Eligibility</button>
+</div>
+
+<div class="container" id="income-screener" style="display: none;">
+  <h2>Income Eligibility Screener</h2>
+  <label>
+    <strong>Total Monthly Household Income:</strong><br>
+    <small>Include all income sources (wages, benefits, etc.)</small>
+    <input type="number" id="income" placeholder="Enter monthly income">
+  </label>
+  <label>
+    <strong>Household Size:</strong><br>
+    <small>Number of people living together</small>
+    <input type="number" id="householdSize" placeholder="Enter household size" min="1">
+  </label>
+  <button type="button" onclick="checkIncomeEligibility()">Check Final Eligibility</button>
+  <button type="button" onclick="goBackToMain()">Go Back</button>
+</div>
+
+<div class="container" id="result" style="display: none;">
+  <h2>Eligibility Results</h2>
+  <div id="result-content"></div>
+  <button type="button" onclick="goBackToMain()">Go Back</button>
+</div>
+
+<script>
+function getIncomeLimits(size) {
+    const fpl = 1215 + (size - 1) * 430;
+    return {
+        snap: fpl * 1.3,
+        wic: fpl * 1.85,
+        tanf: [78, 163, 188, 226, 251][size - 1] || 251,
+        lifeline: fpl * 1.35,
+        eitc: [17640, 46560, 52918, 56838][Math.min(size - 1, 3)] || 0
+    };
+}
+
+function createProgramResult(name, eligible, link, message) {
+    if (!eligible) return ""; // Skip if not eligible
+    return `
+      <div style="border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; border-radius: 5px;">
+        <h3>${name}</h3>
+        <p>Likely Eligible</p>
+        <button onclick="window.open('${link}', '_blank')">${message}</button>
+      </div>
+    `;
+}
+
+function checkPreliminaryEligibility() {
+    const ssn = document.getElementById("ssn").checked;
+    const medicaid = document.getElementById("medicaid").checked;
+    const childrenUnder5 = document.getElementById("childrenUnder5").checked;
+    const over65 = document.getElementById("over65").checked;
+
+    if (!ssn) {
+        document.getElementById("result-content").innerHTML = "<p>You do not meet the basic requirement for eligibility. An SSN is required.</p>";
+        document.getElementById("additional-questions").style.display = "none";
+        document.getElementById("result").style.display = "block";
+        return;
+    }
+
+    document.getElementById("additional-questions").style.display = "none";
+    document.getElementById("income-screener").style.display = "block";
+}
+
+function checkIncomeEligibility() {
+    const income = parseFloat(document.getElementById("income").value);
+    const size = parseInt(document.getElementById("householdSize").value);
+    const ssn = document.getElementById("ssn").checked;
+    const medicaid = document.getElementById("medicaid").checked;
+    const over65 = document.getElementById("over65").checked;
+
+    if (isNaN(income) || isNaN(size) || size < 1) {
+        alert("Please enter valid income and household size.");
+        return;
+    }
+
+    const limits = getIncomeLimits(size);
+    let resultContent = "";
+
+    resultContent += createProgramResult(
+        "SNAP (Food Stamps)",
+        income <= limits.snap,
+        "https://www.yourtexasbenefits.com/Learn/PartnersLogin?sysType=CBO",
+        "Go to the YTB website to continue"
+    );
+    resultContent += createProgramResult(
+        "TANF (Cash Assistance)",
+        income <= limits.tanf && ssn && (document.getElementById('childrenUnder18').checked || document.getElementById('childrenUnder5').checked),
+        "https://www.yourtexasbenefits.com/Learn/PartnersLogin?sysType=CBO",
+        "Go to the YTB website to continue"
+    );
+    resultContent += createProgramResult(
+        "WIC (Women, Infant and Children)",
+        income <= limits.wic,
+        "https://link-health.org/texas-program/#dashboard",
+        "Continue through the LH dashboard"
+    );
+    resultContent += createProgramResult(
+        "Lifeline",
+        income <= limits.lifeline,
+        "https://link-health.org/texas-program/#dashboard",
+        "Continue through the LH dashboard"
+    );
+    resultContent += createProgramResult(
+        "Earned Income Tax Credit",
+        income * 12 <= limits.eitc,
+        "https://link-health.org/texas-program/#dashboard",
+        "Continue through the LH dashboard"
+    );
+    resultContent += createProgramResult(
+        "MSP (Medicare Savings Program)",
+        ssn && over65,
+        "https://www.yourtexasbenefits.com/Learn/PartnersLogin?sysType=CBO",
+        "Go to the YTB website to continue"
+    );
+
+    if (!resultContent) {
+        resultContent = "<p>No programs match your eligibility criteria.</p>";
+    }
+
+    document.getElementById("result-content").innerHTML = resultContent;
+    document.getElementById("income-screener").style.display = "none";
+    document.getElementById("result").style.display = "block";
+}
+
+function goBackToMain() {
+    document.getElementById("additional-questions").style.display = "block";
+    document.getElementById("income-screener").style.display = "none";
+    document.getElementById("result").style.display = "none";
+}
+</script>
+</body>
+</html>
